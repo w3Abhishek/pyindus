@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+indus_session.json
+dummy_session.json
+indus.sarvam.ai.har
+test_output*.txt
+debug_*.txt
+.DS_Store
