@@ -1,6 +1,6 @@
 """CLI entry point for PyIndus.
 
-Provides an interactive login flow.
+Provides an interactive login flow and TUI chat interface.
 """
 
 from __future__ import annotations
@@ -9,7 +9,31 @@ import sys
 
 
 def main():
-    """Interactive login and chat."""
+    """CLI dispatcher: `pyindus` (legacy) or `pyindus chat`."""
+    args = sys.argv[1:]
+
+    if args and args[0] in ("chat", "tui"):
+        from pyindus.tui import main as tui_main
+        sys.argv = [sys.argv[0]] + args[1:]
+        tui_main()
+        return
+
+    if args and args[0] in ("--help", "-h", "help"):
+        print("Usage: pyindus [command]")
+        print()
+        print("Commands:")
+        print("  chat    Launch the interactive TUI chat interface")
+        print("  (none)  Launch the legacy login + chat loop")
+        print()
+        print("Options:")
+        print("  --session-file PATH  Path to session file (default: indus_session.json)")
+        return
+
+    _legacy_main()
+
+
+def _legacy_main():
+    """Interactive login and chat (legacy)."""
     from pyindus.client import IndusClient
 
     client = IndusClient()

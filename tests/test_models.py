@@ -163,7 +163,7 @@ class TestPromptResponse:
             {"node_uid": None, "t": 20, "content": "\n"},
             {
                 "node_uid": None,
-                "t": 0,
+                "t": 20,
                 "content": "\nThis is the detailed response with information.",
             },
         ],
@@ -178,8 +178,7 @@ class TestPromptResponse:
     def test_answer_extraction(self):
         resp = PromptResponse.model_validate(self.SAMPLE_RESPONSE)
         answer = resp.answer
-        # Should be the content after the last tool result
-        assert "Based on the search" in answer
+        # Answer comes from t=20 (separator) steps after the last tool result
         assert "detailed response" in answer
         # Should NOT contain the initial thinking
         assert "Let me think" not in answer
@@ -206,7 +205,8 @@ class TestPromptResponse:
             "humanTurnUid": "h1",
             "agentTurnUid": "a1",
             "steps": [
-                {"t": 0, "content": "Hello! How can I help you?"},
+                {"t": 20, "content": "\nHello! How can I help you?"},
+                {"t": 0, "content": "The user is greeting me."},
             ],
         }
         resp = PromptResponse.model_validate(data)

@@ -3,6 +3,7 @@
 from pyindus.client import IndusClient
 from pyindus.auth import IndusAuth
 from pyindus.models import (
+    Attachment,
     UserInfo,
     ChatAccount,
     TaskGraph,
@@ -23,6 +24,7 @@ __version__ = "0.1.0"
 __all__ = [
     "IndusClient",
     "IndusAuth",
+    "Attachment",
     "UserInfo",
     "ChatAccount",
     "TaskGraph",

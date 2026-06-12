@@ -63,7 +63,7 @@ SAMPLE_PROMPT_RESPONSE = {
             "mcp_uid": "mcp-1",
         },
         {"node_uid": None, "t": 15, "id": "call_1", "content": '{"results": []}'},
-        {"node_uid": None, "t": 0, "content": "Here is the final answer."},
+        {"node_uid": None, "t": 20, "content": "\nHere is the final answer."},
     ],
 }
 

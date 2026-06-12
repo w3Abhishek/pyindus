@@ -5,13 +5,17 @@ Handles chat sessions, prompts, task graphs, and account operations.
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
+from pathlib import Path
+from typing import Iterator
 
 import httpx
 
 from pyindus.exceptions import APIError, AuthenticationError, SessionError
 from pyindus.models import (
+    Attachment,
     ChatAccount,
     ChatSession,
     Config,
@@ -92,30 +96,39 @@ class IndusChat:
             logger.info("Created session: %s", uid)
             return uid
 
-    def send_prompt(self, session_uid: str, prompt: str) -> PromptResponse:
+    def send_prompt(
+        self,
+        session_uid: str,
+        prompt: str,
+        attachments: list[Attachment] | None = None,
+    ) -> PromptResponse:
         """Send a prompt to a chat session.
 
         Args:
             session_uid: The session UID.
             prompt: The user's message.
+            attachments: Optional list of file attachments.
 
         Returns:
             PromptResponse containing the AI's response steps.
         """
-        # Generate trace ID for the request
         trace_id = uuid.uuid4().hex[:32]
+
+        payload: dict = {
+            "sessionUid": session_uid,
+            "prompt": prompt,
+        }
+        if attachments:
+            payload["attachments"] = [a.model_dump(by_alias=True) for a in attachments]
 
         resp = self._request(
             "POST",
             "/api/chat/prompt/prompt",
-            json={
-                "sessionUid": session_uid,
-                "prompt": prompt,
-            },
+            json=payload,
             extra_headers={
                 "x-amzn-trace-id": f"Root=1-{trace_id[:8]}-{trace_id[8:32]};eru={session_uid}",
             },
-            timeout=120.0,  # Prompts can take longer
+            timeout=120.0,
         )
 
         return PromptResponse.model_validate(resp.json())
@@ -135,6 +148,85 @@ class IndusChat:
 
         resp = self._request("GET", "/api/chat/session", params=params)
         return [ChatSession.model_validate(s) for s in resp.json()]
+
+    def delete_session(self, session_uid: str) -> None:
+        """Delete a chat session.
+
+        Args:
+            session_uid: The session UID to delete.
+        """
+        self._request("DELETE", f"/api/chat/session/{session_uid}")
+
+    def upload_attachment(self, file_path: str | Path) -> Attachment:
+        """Upload a file attachment.
+
+        Args:
+            file_path: Path to the file to upload.
+
+        Returns:
+            Attachment object with UID for use in prompts.
+
+        Raises:
+            APIError: If the upload fails.
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise APIError(f"File not found: {path}")
+
+        import mimetypes
+
+        mime_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        file_size = path.stat().st_size
+
+        with open(path, "rb") as f:
+            resp = self._request(
+                "POST",
+                "/api/chat/attachments",
+                files={"file": (path.name, f, mime_type)},
+            )
+
+        uid = resp.text.strip().strip('"')
+        return Attachment(
+            uid=uid,
+            mime=mime_type,
+            filename=path.name,
+            size=file_size,
+        )
+
+    def stream_session(self, session_uid: str) -> Iterator[dict]:
+        """Stream session events via SSE.
+
+        Args:
+            session_uid: The session UID to stream.
+
+        Yields:
+            Parsed JSON dicts from SSE data events.
+        """
+        url = f"{INDUS_BASE_URL}/api/chat/session/{session_uid}/stream"
+        headers = {
+            "accept": "text/event-stream",
+            "origin": INDUS_BASE_URL,
+            "referer": f"{INDUS_BASE_URL}/",
+        }
+
+        with self._client.stream(
+            "GET", url, headers=headers, timeout=60.0
+        ) as resp:
+            if resp.status_code != 200:
+                raise APIError(
+                    f"Stream error {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            for line in resp.iter_lines():
+                line = line.strip()
+                if not line or line.startswith(":"):
+                    continue
+                if line.startswith("data: "):
+                    data_str = line[6:]
+                    try:
+                        yield json.loads(data_str)
+                    except json.JSONDecodeError:
+                        pass
 
     def get_account_me(self) -> ChatAccount:
         """Get chat account info.
@@ -161,6 +253,7 @@ class IndusChat:
         *,
         params: dict | None = None,
         json: dict | None = None,
+        files: dict | None = None,
         extra_headers: dict | None = None,
         timeout: float | None = None,
     ) -> httpx.Response:
@@ -171,6 +264,7 @@ class IndusChat:
             path: API path (relative to INDUS_BASE_URL).
             params: Query parameters.
             json: JSON request body.
+            files: Multipart file upload data.
             extra_headers: Additional headers.
             timeout: Request timeout.
 
@@ -195,6 +289,8 @@ class IndusChat:
             kwargs["params"] = params
         if json is not None:
             kwargs["json"] = json
+        if files is not None:
+            kwargs["files"] = files
         if timeout:
             kwargs["timeout"] = timeout
 
