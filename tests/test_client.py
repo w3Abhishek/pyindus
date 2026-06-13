@@ -72,7 +72,7 @@ SAMPLE_PROMPT = {
     "humanTurnUid": "h1",
     "agentTurnUid": "a1",
     "steps": [
-        {"t": 0, "content": "Hello! Here is my response."},
+        {"t": 20, "content": "\nHello! Here is my response."},
     ],
 }
 

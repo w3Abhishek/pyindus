@@ -14,6 +14,7 @@ from pyindus.auth import IndusAuth
 from pyindus.chat import IndusChat
 from pyindus.exceptions import AuthenticationError, SessionError
 from pyindus.models import (
+    Attachment,
     ChatAccount,
     ChatSession,
     Config,
@@ -186,6 +187,7 @@ class IndusClient:
         *,
         session_uid: str | None = None,
         task_graph_uid: str | None = None,
+        attachments: list[Attachment] | None = None,
     ) -> PromptResponse:
         """Send a message and get a response.
 
@@ -196,6 +198,7 @@ class IndusClient:
             prompt: The user message.
             session_uid: Optional existing session UID for conversation continuity.
             task_graph_uid: Optional task graph UID to specify which model to use.
+            attachments: Optional list of file attachments.
 
         Returns:
             PromptResponse with the AI's response.
@@ -213,7 +216,33 @@ class IndusClient:
         # IndusChat already handles throwing APIErrors, but we can catch 401s
         # and retry once if the token expired mid-session.
 
-        # Determine task graph
+        sid = self.ensure_session(session_uid=session_uid, task_graph_uid=task_graph_uid)
+
+        # Send prompt with auto-retry on 401
+        try:
+            return self._chat.send_prompt(sid, prompt, attachments=attachments)
+        except AuthenticationError:
+            # Token might have expired just now, try to refresh and retry
+            logger.info("Session expired during chat. Attempting auto-refresh...")
+            self._auth.refresh()
+            # Save the newly refreshed session automatically
+            self.save_session()
+            return self._chat.send_prompt(sid, prompt, attachments=attachments)
+
+    def ensure_session(
+        self,
+        *,
+        session_uid: str | None = None,
+        task_graph_uid: str | None = None,
+        title: str = "New Chat",
+    ) -> str:
+        """Return an active session UID, creating one when needed."""
+        if session_uid:
+            self._current_session_uid = session_uid
+            return session_uid
+        if self._current_session_uid:
+            return self._current_session_uid
+
         tg_uid = task_graph_uid or self._default_task_graph_uid
         if not tg_uid:
             models = self.get_models()
@@ -222,25 +251,8 @@ class IndusClient:
             tg_uid = models[0].uid
             self._default_task_graph_uid = tg_uid
 
-        # Use existing session or create a new one
-        if session_uid:
-            sid = session_uid
-        elif self._current_session_uid:
-            sid = self._current_session_uid
-        else:
-            sid = self._chat.create_session(tg_uid)
-            self._current_session_uid = sid
-
-        # Send prompt with auto-retry on 401
-        try:
-            return self._chat.send_prompt(sid, prompt)
-        except AuthenticationError:
-            # Token might have expired just now, try to refresh and retry
-            logger.info("Session expired during chat. Attempting auto-refresh...")
-            self._auth.refresh()
-            # Save the newly refreshed session automatically
-            self.save_session()
-            return self._chat.send_prompt(sid, prompt)
+        self._current_session_uid = self._chat.create_session(tg_uid, title=title)
+        return self._current_session_uid
 
     def new_session(self, task_graph_uid: str | None = None) -> str:
         """Create a new chat session explicitly.
@@ -276,6 +288,44 @@ class IndusClient:
             List of ChatSession objects.
         """
         return self._chat.list_sessions()
+
+    def delete_session(self, session_uid: str | None = None) -> None:
+        """Delete a chat session.
+
+        Args:
+            session_uid: The session to delete. Deletes current session if not provided.
+        """
+        uid = session_uid or self._current_session_uid
+        if not uid:
+            raise SessionError("No session to delete")
+        self._chat.delete_session(uid)
+        if uid == self._current_session_uid:
+            self._current_session_uid = None
+
+    def upload_attachment(self, file_path: str | Path) -> Attachment:
+        """Upload a file for use as a chat attachment.
+
+        Args:
+            file_path: Path to the file to upload.
+
+        Returns:
+            Attachment with UID for use in chat().
+        """
+        return self._chat.upload_attachment(file_path)
+
+    def stream_session(self, session_uid: str | None = None):
+        """Stream session events via SSE.
+
+        Args:
+            session_uid: Session to stream. Uses current session if not provided.
+
+        Yields:
+            Parsed JSON dicts from SSE data events.
+        """
+        uid = session_uid or self._current_session_uid
+        if not uid:
+            raise SessionError("No session to stream")
+        return self._chat.stream_session(uid)
 
     def get_account(self) -> ChatAccount:
         """Get chat account info.

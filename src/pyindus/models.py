@@ -49,6 +49,18 @@ class TaskGraph(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class Attachment(BaseModel):
+    """File attachment for chat prompts."""
+
+    uid: str
+    mime: str = ""
+    filename: str = ""
+    size: int = 0
+    is_uploading: bool = Field(default=False, alias="isUploading")
+
+    model_config = {"populate_by_name": True}
+
+
 class ChatSession(BaseModel):
     """Chat session metadata."""
 
@@ -58,6 +70,12 @@ class ChatSession(BaseModel):
     task_graph_version: int | None = None
     created_at: str = ""
     role: str = ""
+
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        if isinstance(obj, dict) and obj.get("title") is None:
+            obj["title"] = ""
+        return super().model_validate(obj, *args, **kwargs)
 
 
 class Step(BaseModel):
@@ -107,24 +125,21 @@ class PromptResponse(BaseModel):
 
     @property
     def answer(self) -> str:
-        """Extract the final text answer from the steps.
+        """Extract the visible text answer from the steps.
 
-        The final answer is typically the last thinking step (t=0) that
-        contains the synthesized response after all tool calls.
+        The user-facing answer lives in t=20 (separator) steps, not in
+        t=0 (thinking/reasoning) steps which contain internal reasoning.
+        We collect separator content after the last tool result.
         """
-        answer_parts: list[str] = []
-        # Find the last group of thinking steps after tool results
         last_tool_result_idx = -1
         for i, step in enumerate(self.steps):
             if step.is_tool_result:
                 last_tool_result_idx = i
 
-        # Collect all thinking content after the last tool result
         start_idx = last_tool_result_idx + 1 if last_tool_result_idx >= 0 else 0
+        answer_parts: list[str] = []
         for step in self.steps[start_idx:]:
-            if step.is_thinking and step.content:
-                answer_parts.append(step.content)
-            elif step.is_separator and step.content:
+            if step.is_separator and step.content:
                 answer_parts.append(step.content)
 
         return "".join(answer_parts).strip()
