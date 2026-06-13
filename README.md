@@ -1,6 +1,22 @@
-# PyIndus
+<div align="center">
+  <img src="https://i.imageupload.app/afcf6b029fb2cea556cf.svg" alt="PyIndus Logo" width="160"/>
 
-A Python package for interacting with [Indus](https://indus.sarvam.ai), a ChatGPT alternative by Sarvam AI.
+  # PyIndus
+
+  **A Python package for interacting with [Indus](https://indus.sarvam.ai), a ChatGPT alternative by Sarvam AI.**
+
+  [![PyPI version](https://img.shields.io/pypi/v/pyindus?style=flat-square)](https://pypi.org/project/pyindus/)
+  [![Python Version](https://img.shields.io/pypi/pyversions/pyindus?style=flat-square)](https://pypi.org/project/pyindus/)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+  [![Tests](https://img.shields.io/badge/tests-100%2B%20passing-brightgreen?style=flat-square)](#running-tests)
+  [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230?style=flat-square)](https://github.com/astral-sh/ruff)
+
+</div>
+
+---
+<img width="1919" height="1013" alt="image" src="https://github.com/user-attachments/assets/0329d7b4-f57d-472c-952b-ead4620e1b11" />
+
+---
 
 ## Installation
 
@@ -58,7 +74,7 @@ from pyindus import IndusClient
 # Supply a unique path for the user's session
 def handle_user_request(user_id, message):
     session_path = f"sessions/user_{user_id}.json"
-    
+
     # Auto-loads and manages session in this specific file
     with IndusClient(session_file=session_path) as client:
         return client.chat(message)
@@ -93,7 +109,7 @@ from pyindus import IndusClient
 with IndusClient() as client:
     # Upload a file
     attachment = client.upload_attachment("./document.pdf")
-    
+
     # Chat with the attachment
     response = client.chat("Summarize this document", attachments=[attachment])
     print(response.answer)
@@ -110,7 +126,7 @@ with IndusClient() as client:
 
     # Delete a session
     client.delete_session(session_uid)
-    
+
     # Start fresh
     client.new_session()
 ```
@@ -169,27 +185,8 @@ you (Sarvam Think) > what's in this image?
 
 ### Screenshot
 
-```
+<img width="1919" height="1011" alt="image" src="https://github.com/user-attachments/assets/9d01bd8e-b2c7-4a58-8dfb-291fe7cf7bf8" />
 
- ░▄▀▀▄░█░░█░▀█▀░█▀▀▄░█▀▄░█░▒█░█▀▀ 
- ░█▄▄█░█▄▄█░▒█░░█░▒█░█░█░█░▒█░▀▀▄ 
- ░█░░░░▄▄▄▀░▄█▄░▀░░▀░▀▀░░▀▀▀░▀▀▀  
-Welcome to PyIndus TUI
-Type /help for commands, or just start chatting.
-
-you (Sarvam Think) > What is 2+2?
-
-╭────────────────────────── you ──────────────────────────╮
-│ What is 2+2?                                           │
-╰────────────────────────────────────────────────────────╯
-
-  Indus is thinking...
-
-╭────────────────────────── indus ────────────────────────╮
-│ 4                                                      │
-╰────────────────────────────────────────────────────────╯
-  0.9s
-```
 
 ---
 
