@@ -263,6 +263,16 @@ class TestFileReferenceExtraction:
         matches = FILE_REF_RE.findall("@path/to/file.txt hello")
         assert matches == ["path/to/file.txt"]
 
+    def test_file_suggestions_for_at_query(self, tmp_path, monkeypatch):
+        (tmp_path / "open.txt").write_text("hello")
+        (tmp_path / "other.txt").write_text("hello")
+        monkeypatch.chdir(tmp_path)
+
+        tui = PyIndusTUI.__new__(PyIndusTUI)
+        suggestions = tui._suggest_files("summarize @op")
+
+        assert [p.name for p in suggestions] == ["open.txt"]
+
 
 class TestAttachmentModel:
     """Test Attachment model creation."""

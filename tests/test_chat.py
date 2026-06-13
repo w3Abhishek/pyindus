@@ -137,7 +137,7 @@ class TestGetTaskGraphs:
 class TestCreateSession:
     @respx.mock
     def test_create_session(self):
-        respx.post(f"{INDUS_BASE_URL}/api/chat/session").mock(
+        route = respx.post(f"{INDUS_BASE_URL}/api/chat/session").mock(
             return_value=httpx.Response(201, json="01KHYA5REP9CYPDT69GHQM5T5A")
         )
 
@@ -146,6 +146,7 @@ class TestCreateSession:
             chat = IndusChat(client)
             sid = chat.create_session("ef571b75-1cc7-4397-a6fd-e4a45fae154a")
             assert sid == "01KHYA5REP9CYPDT69GHQM5T5A"
+            assert route.calls.last.request.content == b'{"title":"New Chat"}'
         finally:
             client.close()
 

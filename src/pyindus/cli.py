@@ -9,57 +9,47 @@ import sys
 
 
 def main():
-    """CLI dispatcher: `pyindus` (legacy) or `pyindus chat`."""
+    """CLI dispatcher: `pyindus` launches TUI by default."""
     args = sys.argv[1:]
 
-    if args and args[0] in ("chat", "tui"):
+    if not args or args[0] in ("chat", "tui"):
         from pyindus.tui import main as tui_main
-        sys.argv = [sys.argv[0]] + args[1:]
+        sys.argv = [sys.argv[0]] + (args[1:] if args else [])
         tui_main()
         return
+
+
 
     if args and args[0] in ("--help", "-h", "help"):
         print("Usage: pyindus [command]")
         print()
         print("Commands:")
         print("  chat    Launch the interactive TUI chat interface")
-        print("  (none)  Launch the legacy login + chat loop")
+        print("  tui     Alias for chat")
+        print("  auth    Log in with phone number and OTP")
+        print("  (none)  Launch the interactive TUI chat interface")
         print()
         print("Options:")
         print("  --session-file PATH  Path to session file (default: indus_session.json)")
         return
 
-    _legacy_main()
+    if args and args[0] == "auth":
+        _auth_main()
+        return
+
+    print(f"Unknown command: {args[0]}", file=sys.stderr)
+    print("Run `pyindus --help` for usage.", file=sys.stderr)
+    sys.exit(2)
 
 
-def _legacy_main():
-    """Interactive login and chat (legacy)."""
+def _auth_main():
     from pyindus.client import IndusClient
-
     client = IndusClient()
-
-    print("╔══════════════════════════════════════╗")
-    print("║        PyIndus - Indus Chat          ║")
-    print("║     Powered by Sarvam AI             ║")
-    print("╚══════════════════════════════════════╝")
-    print()
-
-    # Try loading existing session
-    try:
-        if client.load_session():
-            user = client.get_user_info()
-            print(f"✓ Session loaded. Welcome back, {user.name}!")
-            _chat_loop(client)
-            return
-    except Exception:
-        pass
-
-    # Interactive login
-    phone = input("Enter your phone number (with country code, e.g., +91...): ").strip()
+    phone = input("Phone number (with country code, e.g. +91...): ").strip()
     if not phone:
         print("Phone number is required.")
         sys.exit(1)
-
+    
     try:
         client.login(phone)
         print(f"✓ OTP sent to {phone}")
@@ -67,7 +57,7 @@ def _legacy_main():
         print(f"✗ Login failed: {e}")
         sys.exit(1)
 
-    code = input("Enter the OTP code: ").strip()
+    code = input("Enter OTP code: ").strip()
     if not code:
         print("OTP code is required.")
         sys.exit(1)
@@ -81,39 +71,6 @@ def _legacy_main():
         print(f"✗ OTP verification failed: {e}")
         sys.exit(1)
 
-    _chat_loop(client)
-
-
-def _chat_loop(client):
-    """Simple interactive chat loop."""
-    print()
-    print("Type your message (or 'quit' to exit, 'new' for new session):")
-    print()
-
-    while True:
-        try:
-            prompt = input("You: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nGoodbye!")
-            break
-
-        if not prompt:
-            continue
-        if prompt.lower() in ("quit", "exit", "q"):
-            print("Goodbye!")
-            break
-        if prompt.lower() == "new":
-            client.new_session()
-            print("✓ New session started.")
-            continue
-
-        try:
-            response = client.chat(prompt)
-            print(f"\nIndus: {response.answer}\n")
-        except Exception as e:
-            print(f"\n✗ Error: {e}\n")
-
-    client.close()
 
 
 if __name__ == "__main__":

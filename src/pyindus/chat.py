@@ -66,11 +66,12 @@ class IndusChat:
         resp = self._request("GET", f"/api/chat/task-graphs/{uid}")
         return TaskGraph.model_validate(resp.json())
 
-    def create_session(self, task_graph_uid: str) -> str:
+    def create_session(self, task_graph_uid: str | None = None, title: str = "New Chat") -> str:
         """Create a new chat session.
 
         Args:
-            task_graph_uid: UID of the task graph (model) to use.
+            task_graph_uid: Deprecated UID of the task graph (model) to use.
+            title: Initial title for the session.
 
         Returns:
             The session UID.
@@ -78,7 +79,7 @@ class IndusChat:
         resp = self._request(
             "POST",
             "/api/chat/session",
-            json={"task_graph_uid": task_graph_uid},
+            json={"title": title},
         )
 
         if resp.status_code != 201:

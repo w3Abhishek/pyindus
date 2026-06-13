@@ -216,23 +216,7 @@ class IndusClient:
         # IndusChat already handles throwing APIErrors, but we can catch 401s
         # and retry once if the token expired mid-session.
 
-        # Determine task graph
-        tg_uid = task_graph_uid or self._default_task_graph_uid
-        if not tg_uid:
-            models = self.get_models()
-            if not models:
-                raise SessionError("No models available")
-            tg_uid = models[0].uid
-            self._default_task_graph_uid = tg_uid
-
-        # Use existing session or create a new one
-        if session_uid:
-            sid = session_uid
-        elif self._current_session_uid:
-            sid = self._current_session_uid
-        else:
-            sid = self._chat.create_session(tg_uid)
-            self._current_session_uid = sid
+        sid = self.ensure_session(session_uid=session_uid, task_graph_uid=task_graph_uid)
 
         # Send prompt with auto-retry on 401
         try:
@@ -244,6 +228,31 @@ class IndusClient:
             # Save the newly refreshed session automatically
             self.save_session()
             return self._chat.send_prompt(sid, prompt, attachments=attachments)
+
+    def ensure_session(
+        self,
+        *,
+        session_uid: str | None = None,
+        task_graph_uid: str | None = None,
+        title: str = "New Chat",
+    ) -> str:
+        """Return an active session UID, creating one when needed."""
+        if session_uid:
+            self._current_session_uid = session_uid
+            return session_uid
+        if self._current_session_uid:
+            return self._current_session_uid
+
+        tg_uid = task_graph_uid or self._default_task_graph_uid
+        if not tg_uid:
+            models = self.get_models()
+            if not models:
+                raise SessionError("No models available")
+            tg_uid = models[0].uid
+            self._default_task_graph_uid = tg_uid
+
+        self._current_session_uid = self._chat.create_session(tg_uid, title=title)
+        return self._current_session_uid
 
     def new_session(self, task_graph_uid: str | None = None) -> str:
         """Create a new chat session explicitly.
